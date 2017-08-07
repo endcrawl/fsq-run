@@ -1,0 +1,15 @@
+#!/bin/sh
+set -ex
+mkdir -p q1/tmp q1/queue q1/done q1/fail
+mkdir -p q2/tmp q2/queue q2/done q2/fail
+touch q1/tmp/001
+mv q1/tmp/001 q1/queue
+if fsq-run -u ./q2 ./q1 false; then exit 100; fi  # fsq-run should fail
+test ! -e q1/tmp/001
+test ! -e q1/queue/001
+test ! -e q1/done/001
+test   -f q1/fail/001
+test ! -e q2/tmp/001
+test ! -e q2/queue/001
+test ! -e q2/done/001
+test ! -e q2/fail/001

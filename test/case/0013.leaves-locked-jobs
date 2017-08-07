@@ -1,0 +1,13 @@
+#!/bin/sh
+set -ex
+if [ "${FSQ_RUN_TEST_LOCK:-0}" -eq 0 ]; then
+  mkdir -p q/tmp q/queue q/done q/fail
+  touch q/tmp/001
+  mv q/tmp/001 q/queue
+  exec setlock q/queue/001 env FSQ_RUN_TEST_LOCK=1 "$0" "$@"
+fi
+fsq-run ./q true
+test ! -e q/tmp/001
+test   -f q/queue/001
+test ! -e q/done/001
+test ! -e q/fail/001

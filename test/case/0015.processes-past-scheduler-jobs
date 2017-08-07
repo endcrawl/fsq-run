@@ -1,0 +1,11 @@
+#!/bin/sh
+set -ex
+mkdir -p q/tmp q/queue q/done q/fail
+past=$(( `date +%s` - 1 ))
+touch q/tmp/$past
+mv q/tmp/$past q/queue
+fsq-run -S ./q true
+test ! -e q/tmp/$past
+test ! -e q/queue/$past
+test   -f q/done/$past
+test ! -e q/fail/$past

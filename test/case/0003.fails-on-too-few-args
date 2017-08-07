@@ -1,0 +1,5 @@
+#!/bin/sh
+fsq-run
+test $? -gt 0 || exit 100
+fsq-run foo
+test $? -gt 0 || exit 100

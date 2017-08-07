@@ -1,0 +1,12 @@
+#!/bin/sh
+set -ex
+mkdir -p q/tmp q/queue q/done q/fail
+touch q/tmp/001
+mv q/tmp/001 q/queue
+fsq-run -H -B 'touch ./before-hook' -A 'touch ./after-hook' ./q true
+test ! -e q/tmp/001
+test ! -e q/queue/001
+test   -f q/done/001
+test ! -e q/fail/001
+test ! -e ./before-hook
+test ! -e ./after-hook

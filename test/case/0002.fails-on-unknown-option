@@ -1,0 +1,3 @@
+#!/bin/sh
+fsq-run -X
+test $? -gt 0

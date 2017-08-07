@@ -1,0 +1,183 @@
+#!/bin/sh
+
+usage() { 
+  echo "usage: ${0##*/} [-h] [-v] [-q] [-U] [-H] [-S]" \
+    "[-B before] [-A after] [-u upstream] [-Q queuedir] [-D donedir] [-T tmpdir] [-F faildir]" \
+    "dir prog arg1 arg2 ..."
+}
+
+main() {
+  # apply defaults to environment.
+  export FSQ_QUEUEDIR="${FSQ_QUEUEDIR:-queue}"
+  export FSQ_DONEDIR="${FSQ_DONEDIR:-done}"
+  export FSQ_TMPDIR="${FSQ_TMPDIR:-tmp}"
+  export FSQ_FAILDIR="${FSQ_FAILDIR:-fail}"
+  export FSQ_UPSTREAM="${FSQ_UPSTREAM:-}"
+  export FSQ_FAILUPSTREAM="${FSQ_FAILUPSTREAM:-0}"
+  export FSQ_VERBOSE="${FSQ_VERBOSE:-0}"
+  export FSQ_WORKFILE="${FSQ_WORKFILE:-}"
+  export FSQ_HOOKS="${FSQ_HOOKS:-1}"
+  export FSQ_BEFORE="${FSQ_BEFORE:-}"
+  export FSQ_AFTER="${FSQ_AFTER:-}"
+  export FSQ_SCHEDULER="${FSQ_SCHEDULER:-0}"
+
+  # process command line options as environment overrides.
+  moreopts=1
+  while [ $# -gt 0 -a $moreopts -gt 0 ]; do
+    case "$1" in
+      -A) FSQ_AFTER="$2"       ; shift ; shift || misusage ;;
+      -B) FSQ_BEFORE="$2"      ; shift ; shift || misusage ;;
+      -D) FSQ_DONEDIR="$2"     ; shift ; shift || misusage ;;
+      -F) FSQ_FAILDIR="$2"     ; shift ; shift || misusage ;;
+      -h) usage                ; exit 0 ;;
+      -H) FSQ_HOOKS=0          ; shift ;;
+      -q) FSQ_VERBOSE=0        ; shift ;;
+      -Q) FSQ_QUEUEDIR="$2"    ; shift ; shift || misusage ;;
+      -S) FSQ_SCHEDULER=1      ; shift ;;
+      -T) FSQ_TMPDIR="$2"      ; shift ; shift || misusage ;;
+      -u) FSQ_UPSTREAM="$2"    ; shift ; shift || misusage ;;
+      -U) FSQ_FAILUPSTREAM=1   ; shift ;;
+      -v) FSQ_VERBOSE=1        ; shift ;;
+      -w) FSQ_WORKFILE="$2"    ; shift ; shift || misusage ;;
+      --) moreopts=0           ; shift ;;
+      -*) misusage ;;
+      *) moreopts=0 ;;
+    esac
+  done
+
+  [ $# -gt 1 ] || misusage
+  dir="${1%/}" ; shift
+  # remaining argv is the subordinate program plus its args.
+  [ -d "$dir" ] || barf "$dir is not a directory"
+  [ -r "$dir" ] || barf "permission denied: $dir"
+
+  # with a workfile, process it.
+  # without a workfile, enter scan mode and re-exec on each workfile.
+  if [ -n "$FSQ_WORKFILE" ]; then
+    fsq_process "$@"
+  else
+    fsq_scan "$@"
+  fi
+}
+
+fsq_scan() {
+  log "scanning: $dir/$FSQ_QUEUEDIR"
+  status=0
+  for workfile in "$dir/$FSQ_QUEUEDIR"/*; do
+    test -f "$workfile" || continue
+    # in scheduler mode, assume workfile starts with a timestamp;
+    # skip job files that are in the future.
+    if [ "$FSQ_SCHEDULER" -gt 0 ]; then
+      basename="${workfile##*/}"
+      now=`safe date +%s` || exit $?
+      test "${basename%%.*}" -le "$now" || continue
+    fi
+    log "locking: $workfile"
+    setlock -n "$workfile" "$0" -w "$workfile" "$dir" "$@" ; rc=$?
+    if [ $rc -gt 0 -a $rc -ne 111 ]; then
+      status=$rc
+    fi
+  done
+  return $status
+}
+
+fsq_process() {
+  status=0
+  skip=0
+
+  # special preparations if linked to an upstream queue.
+  if [ -n "$FSQ_UPSTREAM" ]; then
+    basename="${FSQ_WORKFILE##*/}"
+    tmpfile="$FSQ_UPSTREAM/$FSQ_TMPDIR/$basename"
+    outfile="$FSQ_UPSTREAM/$FSQ_QUEUEDIR/$basename"
+    skipfile="$FSQ_UPSTREAM/$FSQ_DONEDIR/$basename"
+    # workfile has already been processed, done.
+    if [ -e "$outfile" -o -e "$skipfile" ]; then
+      skip=1
+    else
+      # redirect worker stdout to the upstream queue.
+      exec > "$tmpfile"
+    fi
+  fi
+
+  # new workfile: run subordinate program and capture result.
+  if [ "$skip" -gt 0 ]; then
+    log "skipping, already done: $FSQ_WORKFILE"
+  else
+    log "processing: $FSQ_WORKFILE"
+    # execute pre-job hook
+    [ -n "$FSQ_BEFORE" -a "$FSQ_HOOKS" -gt 0 ] && sh -c "$FSQ_BEFORE"
+    # run worker program
+    (
+      export FSQ_JOB="${FSQ_WORKFILE##*/}"
+      exec < "$FSQ_WORKFILE"
+      unset FSQ_WORKFILE
+      unset FSQ_QUEUEDIR
+      unset FSQ_DONEDIR
+      unset FSQ_TMPDIR
+      unset FSQ_FAILDIR
+      unset FSQ_UPSTREAM
+      unset FSQ_FAILUPSTREAM
+      unset FSQ_VERBOSE
+      unset FSQ_HOOKS
+      unset FSQ_BEFORE
+      unset FSQ_AFTER
+      unset FSQ_SCHEDULER
+      "$@"
+    )
+    status="$?"
+  fi
+
+  # transition workfile according to processing outcome.
+  case "$status" in
+    # success => donedir.
+      0) safe mv "$FSQ_WORKFILE" "$dir/$FSQ_DONEDIR"
+         log "success: $FSQ_WORKFILE"
+         ;;
+    # temporary failure => leave in place.
+    111) shout "temporary failure $status: $FSQ_WORKFILE"
+         ;;
+    # permanent failure => faildir.
+    100) shout "permanent failure $status: $FSQ_WORKFILE"
+         safe mv "$FSQ_WORKFILE" "$dir/$FSQ_FAILDIR"
+         ;;
+    # all other failures => faildir.
+      *) shout "failure $status: $FSQ_WORKFILE"
+         safe mv "$FSQ_WORKFILE" "$dir/$FSQ_FAILDIR"
+         ;;
+  esac
+
+  # if linked to an upstream queue, nonempty output becomes input for the next.
+  if [ -n "$FSQ_UPSTREAM" -a "$skip" -eq 0 ]; then
+    # record success in the upstream queue.
+    if [ "$status" -eq 0 ]; then
+      # non-empty output: enqueue it as an upstream job.
+      # empty output: mark as already done via a skip file.
+      if [ -s "$tmpfile" ]; then
+        safe mv "$tmpfile" "$outfile"
+      else
+        safe mv "$tmpfile" "$skipfile"
+      fi
+    # hard failure and failing upstream: also enqueue output as an upstream job.
+    elif [ "$status" -ne 111 -a "$FSQ_FAILUPSTREAM" -gt 0 ]; then
+      safe mv "$tmpfile" "$outfile"
+    # temporary failure or not failing upstream: remove upstream temp file.
+    else
+      safe rm -f "$tmpfile"
+    fi
+  fi
+
+  # execute post-job hook
+  [ -n "$FSQ_AFTER" -a "$FSQ_HOOKS" -gt 0 ] && FSQ_STATUS="$status" sh -c "$FSQ_AFTER"
+
+  return $status
+}
+
+shout() { echo "${0##*/}/$$: $*" >&2; }
+barf() { shout "fatal: $*"; exit 111; }
+safe() { "$@" || barf "cannot $*"; }
+log() { test "$FSQ_VERBOSE" -le 0 || shout "$@"; }
+misusage() { usage 1>&2 ; exit 1 ; }
+
+main "$@"
+

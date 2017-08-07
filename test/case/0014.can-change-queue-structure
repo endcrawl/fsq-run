@@ -1,0 +1,10 @@
+#!/bin/sh
+set -ex
+mkdir -p q/xtmp q/xqueue q/xdone q/xfail
+touch q/xtmp/001
+mv q/xtmp/001 q/xqueue
+fsq-run -T xtmp -Q xqueue -D xdone -F xfail ./q true
+test ! -e q/xtmp/001
+test ! -e q/xqueue/001
+test   -f q/xdone/001
+test ! -e q/xfail/001

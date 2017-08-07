@@ -1,0 +1,6 @@
+#!/bin/sh
+fsq-run ./nonexistent true
+test $? -gt 0 || exit 100
+touch ./regular-file
+fsq-run ./regular-file true
+test $? -gt 0 || exit 100

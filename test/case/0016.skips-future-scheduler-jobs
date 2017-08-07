@@ -1,0 +1,11 @@
+#!/bin/sh
+set -ex
+mkdir -p q/tmp q/queue q/done q/fail
+future=$(( `date +%s` + 86400 ))
+touch q/tmp/$future
+mv q/tmp/$future q/queue
+fsq-run -S ./q true
+test ! -e q/tmp/$future
+test   -f q/queue/$future
+test ! -e q/done/$future
+test ! -e q/fail/$future

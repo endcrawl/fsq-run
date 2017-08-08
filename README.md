@@ -18,3 +18,10 @@ fsq-run [options] ./qdir program arguments
     -h                  Display help.
 ```
 
+## Requirements
+
+```
+which setlock   # from daemontools
+make check      # ensure tests pass
+```
+

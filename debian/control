@@ -1,0 +1,15 @@
+Source: fsq-run
+Section: utils
+Priority: optional
+Maintainer: Alan Grow <alangrow@gmail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.7.3.0
+Vcs-Git: git@github.com:endcrawl/fsq-run.git
+Vcs-Browser: https://github.com/endcrawl/fsq-run
+
+Package: fsq-run
+Section: utils
+Architecture: all
+Depends: daemontools (>= 1:0.76)
+Description: A filesystem queue processor.
+

@@ -31,11 +31,16 @@ jobs:
           STATUS: ${{ job.status }}
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          case "$STATUS" in
+            success)   COLOR="#41aa58" ;;
+            failure)   COLOR="#ff0000" ;;
+            cancelled) COLOR="#ff5800" ;;
+          esac
           test -z "$SLACK_WEBHOOK" || curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
           {
             "text"         : "This is text: $STATUS",
             "attachments"  : [{
-              "color"      : "#41aa58",
+              "color"      : "$COLOR",
               "title"      : "This is the title: $STATUS",
               "title_link" : "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
             }]

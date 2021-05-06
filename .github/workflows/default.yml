@@ -41,12 +41,33 @@ jobs:
             failure)   COLOR="#ff0000" ; VERB="Failed" ;;
             cancelled) COLOR="#ff5800" ; VERB="Cancelled" ;;
           esac
-          STARTED=$(curl -s -u $GITHUB_ACTOR:$GITHUB_TOKEN -H "Accept: application/vnd.github.v3+json" $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs | grep '^      "started_at":' | cut -f4 -d'"')
+          STARTED=$(
+            curl -s \
+              -u $GITHUB_ACTOR:$GITHUB_TOKEN \
+              -H "Accept: application/vnd.github.v3+json" \
+              $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs |
+            grep '^      "started_at":' |
+            cut -f4 -d'"'
+          )
           ELAPSED=$(( `date +%s` - `date -d "$STARTED" +%s` ))
+          GITHUB_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          LINE1=$( printf "%s check <%s|#%s> for <%s|\`%s\`> in <%s|%s> (<%s|*\`%s\`*>) *by %s*" \
+            "$VERB" \
+            "$GITHUB_REPO_URL/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA" \
+            "$GITHUB_RUN_NUMBER" \
+            "$GITHUB_REPO_URL/commit/${COMMIT_SHA}" \
+            "${COMMIT_SHA:0:8}" \
+            "$GITHUB_REPO_URL" \
+            "$GITHUB_REPOSITORY" \
+            "$GITHUB_REPO_URL/tree/$GITHUB_HEAD_REF" \
+            "$GITHUB_HEAD_REF" \
+            "$GITHUB_ACTOR"
+          )
+          LINE2="_Elapsed: ${ELAPSED}s_"
           test -z "$SLACK_WEBHOOK" || curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
           {
             "attachments": [{
-              "text": "$VERB check <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA|#$GITHUB_RUN_NUMBER> for <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/${COMMIT_SHA}|\`${COMMIT_SHA:0:8}\`> in <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY|$GITHUB_REPOSITORY> (<$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_HEAD_REF|*\`$GITHUB_HEAD_REF\`*>) *by $GITHUB_ACTOR*\n_Elapsed: ${ELAPSED}s_",
+              "text": "$LINE1\n$LINE2",
               "color": "$COLOR"
             }]
           }

@@ -29,14 +29,15 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.CHECKS_SLACK_WEBHOOK_URL }}
           STATUS: ${{ job.status }}
+          PR_NUMBER: ${{ github.event.number }}
         run: |
           test -z "$SLACK_WEBHOOK" || curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
           {
-            "text"         : "This is text.",
+            "text"         : "This is text: $STATUS",
             "attachments"  : [{
               "color"      : "#41aa58",
-              "title"      : "This is a title.",
-              "title_link" : "https://endcrawl.com/"
+              "title"      : "This is the title: $STATUS",
+              "title_link" : "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
             }]
           }
           EOSLACKJSON

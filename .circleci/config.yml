@@ -13,12 +13,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Update Packages
-          command: sudo apt-get update
-      - run:
-          name: Install Required Packages
-          command: sudo apt-get install daemontools
-      - run:
           name: Run Tests
           command: make check
       - slack/notify:

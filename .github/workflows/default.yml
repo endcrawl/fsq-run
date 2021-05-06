@@ -9,6 +9,9 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,19 +33,21 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.CHECKS_SLACK_WEBHOOK_URL }}
           STATUS: ${{ job.status }}
           PR_NUMBER: ${{ github.event.number }}
+          COMMIT_SHA: ${{ github.event.after }}
+        shell: bash
         run: |
           case "$STATUS" in
-            success)   COLOR="#41aa58" ;;
-            failure)   COLOR="#ff0000" ;;
-            cancelled) COLOR="#ff5800" ;;
+            success)   COLOR="#41aa58" ; VERB="Passed" ;;
+            failure)   COLOR="#ff0000" ; VERB="Failed" ;;
+            cancelled) COLOR="#ff5800" ; VERB="Cancelled" ;;
           esac
+          STARTED=$(curl -s -u $GITHUB_ACTOR:$GITHUB_TOKEN -H "Accept: application/vnd.github.v3+json" $GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs | grep '^      "started_at":' | cut -f4 -d'"')
+          ELAPSED=$(( `date +%s` - `date -d "$STARTED" +%s` ))
           test -z "$SLACK_WEBHOOK" || curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
           {
-            "text"         : "This is text: $STATUS",
-            "attachments"  : [{
-              "color"      : "$COLOR",
-              "title"      : "This is the title: $STATUS",
-              "title_link" : "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
+            "attachments": [{
+              "text": "$VERB check <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA|#$GITHUB_RUN_NUMBER> for <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/${COMMIT_SHA}|\`${COMMIT_SHA:0:8}\`> in <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY|$GITHUB_REPOSITORY> (<$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_HEAD_REF|*\`$GITHUB_HEAD_REF\`*>) *by $GITHUB_ACTOR*\n_Elapsed: ${ELAPSED}s_",
+              "color": "$COLOR"
             }]
           }
           EOSLACKJSON

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+set -e
+
+test -n "$SLACK_WEBHOOK" || {
+  echo "No SLACK_WEBHOOK defined, skipping." 1>&2
+  exit 0
+}
+
+GITHUB_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+
+case "$STATUS" in
+  success)   COLOR="#41aa58" ; VERB="Passed" ;;
+  failure)   COLOR="#ff0000" ; VERB="Failed" ;;
+  cancelled) COLOR="#ff5800" ; VERB="Cancelled" ;;
+esac
+
+LINE1=$( printf "%s check <%s|#%s> for <%s|\`%s\`> in <%s|%s> (<%s|*\`%s\`*>) *by %s*" \
+  "$VERB" \
+  "$GITHUB_REPO_URL/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA" \
+  "$GITHUB_RUN_NUMBER" \
+  "$GITHUB_REPO_URL/commit/${COMMIT_SHA}" \
+  "${COMMIT_SHA:0:8}" \
+  "$GITHUB_REPO_URL" \
+  "$GITHUB_REPOSITORY" \
+  "$GITHUB_REPO_URL/tree/$GITHUB_HEAD_REF" \
+  "$GITHUB_HEAD_REF" \
+  "$GITHUB_ACTOR"
+)
+
+STARTED=$(
+  curl -s \
+    -u "$GITHUB_ACTOR:$GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3+json" \
+    "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" |
+  grep '^      "started_at":' |
+  cut -f4 -d'"'
+)
+ELAPSED=$(( `date +%s` - `date -d "$STARTED" +%s` ))
+LINE2="_Elapsed: ${ELAPSED}s_"
+
+curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
+{
+  "attachments": [{
+    "text": "$LINE1\n$LINE2",
+    "color": "$COLOR"
+  }]
+}
+EOSLACKJSON

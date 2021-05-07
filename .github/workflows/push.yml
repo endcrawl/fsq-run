@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push: [ master ]
+
+permissions:
+  actions: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/acg/ubuntu1404-fsq-run:latest
+      credentials:
+        username: acg
+        password: ${{ secrets.DOCKER_CONTAINER_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Tests
+        run: make check
+      - name: Report Status to Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.CHECKS_SLACK_WEBHOOK_URL }}
+          STATUS: ${{ job.status }}
+        run: |
+          "${GITHUB_WORKSPACE}"/.github/scripts/notify-slack

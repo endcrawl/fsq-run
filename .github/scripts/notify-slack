@@ -15,8 +15,9 @@ case "$STATUS" in
   cancelled) COLOR="#ff5800" ; VERB="Cancelled" ;;
 esac
 
-LINE1=$( printf "%s check <%s|#%s> for <%s|\`%s\`> in <%s|%s> (<%s|*\`%s\`*>) *by %s*" \
+LINE1=$( printf "%s \`%s\` check <%s|#%s> for <%s|\`%s\`> in <%s|%s> (<%s|*\`%s\`*>) *by %s*" \
   "$VERB" \
+  "$GITHUB_JOB" \
   "$GITHUB_REPO_URL/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA" \
   "$GITHUB_RUN_NUMBER" \
   "$GITHUB_REPO_URL/commit/${COMMIT_SHA}" \

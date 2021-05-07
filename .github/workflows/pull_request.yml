@@ -7,7 +7,7 @@ permissions:
   actions: read
 
 jobs:
-  build-pull-request:
+  pr:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/acg/ubuntu1404-fsq-run:latest

@@ -16,28 +16,24 @@ esac
 GITHUB_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
 
 if [ -n "$PR_NUMBER" ]; then
-  LINE1=$( printf "%s _%s_ check <%s|#%s> for <%s|\`%s\`> in <%s|%s> (<%s|*\`%s\`*>) *by %s*" \
+  LINE1=$( printf "%s _%s_ check <%s|#%s> for <%s|\`%s\`> (<%s|*\`%s\`*>) *by %s*" \
     "$VERB" \
     "$GITHUB_JOB" \
     "$GITHUB_REPO_URL/pull/$PR_NUMBER/checks?sha=$COMMIT_SHA" \
     "$GITHUB_RUN_NUMBER" \
     "$GITHUB_REPO_URL/commit/${COMMIT_SHA}" \
     "${COMMIT_SHA:0:8}" \
-    "$GITHUB_REPO_URL" \
-    "$GITHUB_REPOSITORY" \
     "$GITHUB_REPO_URL/tree/$GITHUB_HEAD_REF" \
     "$GITHUB_HEAD_REF" \
     "$GITHUB_ACTOR"
   )
 else
-  LINE1=$( printf "%s \`%s\` check #%s for <%s|\`%s\`> in <%s|%s> *by %s*" \
+  LINE1=$( printf "%s \`%s\` check #%s for <%s|\`%s\`> *by %s*" \
     "$VERB" \
     "$GITHUB_JOB" \
     "$GITHUB_RUN_NUMBER" \
     "$GITHUB_REPO_URL/commit/${GITHUB_SHA}" \
     "${GITHUB_SHA:0:8}" \
-    "$GITHUB_REPO_URL" \
-    "$GITHUB_REPOSITORY" \
     "$GITHUB_ACTOR"
   )
 fi
@@ -57,7 +53,8 @@ curl -f -d @- -H "Content-Type: application/json" "$SLACK_WEBHOOK" <<EOSLACKJSON
 {
   "attachments": [{
     "text": "$LINE1\n$LINE2",
-    "color": "$COLOR"
+    "color": "$COLOR",
+    "footer": "<$GITHUB_REPO_URL|$GITHUB_REPOSITORY>"
   }]
 }
 EOSLACKJSON

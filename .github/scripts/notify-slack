@@ -28,9 +28,11 @@ if [ -n "$PR_NUMBER" ]; then
     "$GITHUB_ACTOR"
   )
 else
-  LINE1=$( printf "%s \`%s\` check #%s for <%s|\`%s\`> *by %s*" \
+  env | sort
+  LINE1=$( printf "%s _%s_ check <%s|#%s> for <%s|\`%s\`> *by %s*" \
     "$VERB" \
     "$GITHUB_JOB" \
+    "$GITHUB_REPO_URL/actions" \
     "$GITHUB_RUN_NUMBER" \
     "$GITHUB_REPO_URL/commit/${GITHUB_SHA}" \
     "${GITHUB_SHA:0:8}" \

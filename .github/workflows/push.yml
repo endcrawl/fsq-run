@@ -17,13 +17,14 @@ jobs:
         username: acg
         password: ${{ secrets.DOCKER_CONTAINER_REGISTRY_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
+
       - name: Run Tests
         run: make check
+
       - name: Report Status to Slack
         if: always()
-        env:
-          SLACK_WEBHOOK: ${{ secrets.CHECKS_SLACK_WEBHOOK_URL }}
-          STATUS: ${{ job.status }}
-        run: |
-          "${GITHUB_WORKSPACE}"/.github/scripts/notify-slack
+        uses: endcrawl/github-action-slack-notify-curl@master
+        with:
+          slack_webhook: ${{ secrets.CHECKS_SLACK_WEBHOOK_URL }}
